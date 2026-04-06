@@ -27,6 +27,10 @@ export default function DropZone() {
 
     if (result.success && result.data) {
       setParsed(result.data);
+      // Show warnings (non-blocking) from PDF parsing
+      if (result.errors && result.errors.length > 0) {
+        setErrors(result.errors);
+      }
     } else {
       setErrors(result.errors || []);
     }
@@ -86,17 +90,19 @@ export default function DropZone() {
         <p className="text-sm text-gray-400 mt-2">Accepts .csv, .xlsx, and .pdf files</p>
       </div>
 
-      {/* Validation errors */}
+      {/* Validation errors or warnings */}
       {errors.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <div className={`${parsed ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-3">
-            <AlertCircle size={20} className="text-red-500" />
-            <h3 className="font-semibold text-red-700">Validation Errors</h3>
+            <AlertCircle size={20} className={parsed ? 'text-amber-500' : 'text-red-500'} />
+            <h3 className={`font-semibold ${parsed ? 'text-amber-700' : 'text-red-700'}`}>
+              {parsed ? 'Warnings — Please verify the extracted data below' : 'Validation Errors'}
+            </h3>
           </div>
           <ul className="space-y-1">
             {errors.map((err, i) => (
-              <li key={i} className="text-sm text-red-600">
-                <span className="font-mono text-xs bg-red-100 px-1 rounded">{err.field}</span>{' '}
+              <li key={i} className={`text-sm ${parsed ? 'text-amber-600' : 'text-red-600'}`}>
+                <span className={`font-mono text-xs ${parsed ? 'bg-amber-100' : 'bg-red-100'} px-1 rounded`}>{err.field}</span>{' '}
                 {err.message}
               </li>
             ))}

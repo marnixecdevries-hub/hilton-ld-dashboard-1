@@ -111,8 +111,8 @@ function parseDate(str: string): Date | null {
     if (!isNaN(d.getTime())) return d;
   }
 
-  // Try DD/MM/YYYY or DD-MM-YYYY
-  const euMatch = str.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+  // Try DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const euMatch = str.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
   if (euMatch) {
     const d = new Date(parseInt(euMatch[3]), parseInt(euMatch[2]) - 1, parseInt(euMatch[1]));
     if (!isNaN(d.getTime())) return d;
@@ -215,6 +215,11 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
     }
     const fullText = textLines.join('\n');
 
+    // DEBUG: Log extracted text to understand PDF structure
+    console.log('=== PDF EXTRACTED TEXT ===');
+    console.log(fullText);
+    console.log('=== END PDF TEXT ===');
+
     // Try to extract form fields from the PDF text
     const data = extractScorecardFromText(fullText);
 
@@ -228,24 +233,81 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
       };
     }
 
-    // Validate the extracted data
-    const row: Record<string, string> = {
-      trainer_name: data.trainer_name || '',
-      trainer_department: data.trainer_department || '',
-      hotel_code: data.hotel_code || '',
-      manager_name: data.manager_name || '',
-      manager_department: data.manager_department || '',
-      evaluation_date: data.evaluation_date || '',
-      score_work_area: data.score_work_area || '',
-      score_appearance: data.score_appearance || '',
-      score_body_language: data.score_body_language || '',
-      score_voice: data.score_voice || '',
-      score_attention: data.score_attention || '',
-      score_preparation: data.score_preparation || '',
-      score_demonstration: data.score_demonstration || '',
-      score_practice: data.score_practice || '',
-      score_follow_through: data.score_follow_through || '',
-      score_question_techniques: data.score_question_techniques || '',
+    // For PDFs, use lenient validation — fill defaults for missing fields
+    const dateStr = data.evaluation_date || '';
+    let evaluationDate = '';
+    if (dateStr) {
+      const parsedDate = parseDate(dateStr);
+      evaluationDate = parsedDate ? formatDateISO(parsedDate) : new Date().toISOString().split('T')[0];
+    } else {
+      evaluationDate = new Date().toISOString().split('T')[0];
+    }
+
+    // Default missing scores to 0 (will show as needing review)
+    const getScore = (field: string) => {
+      const val = parseInt(data[field], 10);
+      return (val >= 1 && val <= 5) ? val : 0;
+    };
+
+    // Validate hotel code — try fuzzy matching for OCR errors (e.g. AMSCS → AMCSC)
+    let hotelCode = (data.hotel_code || '').trim().toUpperCase();
+    if (hotelCode && !HOTEL_CODES.includes(hotelCode as typeof HOTEL_CODES[number])) {
+      // Try to find closest match (1-character difference)
+      const fuzzy = HOTEL_CODES.find(code => {
+        if (Math.abs(code.length - hotelCode.length) > 1) return false;
+        let diffs = 0;
+        const longer = code.length >= hotelCode.length ? code : hotelCode;
+        const shorter = code.length < hotelCode.length ? code : hotelCode;
+        let si = 0;
+        for (let li = 0; li < longer.length && diffs <= 1; li++) {
+          if (shorter[si] === longer[li]) { si++; }
+          else { diffs++; if (code.length === hotelCode.length) si++; }
+        }
+        return diffs <= 1;
+      });
+      hotelCode = fuzzy || '';
+    }
+
+    // Collect warnings for missing data (non-blocking)
+    const warnings: ValidationError[] = [];
+    if (!data.trainer_name) warnings.push({ field: 'trainer_name', message: 'Could not extract trainer name from PDF — please verify after upload' });
+    if (!hotelCode) warnings.push({ field: 'hotel_code', message: 'Could not extract hotel code from PDF — please verify after upload' });
+
+    const scoreFields = SCORE_FIELDS;
+    const missingScores = scoreFields.filter(f => getScore(f) === 0);
+    if (missingScores.length > 0) {
+      warnings.push({ field: 'scores', message: `Could not extract ${missingScores.length} score(s) from PDF — please verify after upload` });
+    }
+
+    // Check that we have at least some useful data (scores or trainer name)
+    const hasAnyScore = scoreFields.some(f => getScore(f) > 0);
+    if (!data.trainer_name && !hasAnyScore) {
+      return {
+        success: false,
+        errors: [{
+          field: 'pdf',
+          message: 'Could not extract any meaningful data from this PDF. Please ensure the PDF is a Hilton Train the Trainer evaluation form, or use CSV/Excel format instead.',
+        }],
+      };
+    }
+
+    const evaluation: ParsedEvaluation = {
+      trainer_name: data.trainer_name || 'Unknown Trainer',
+      trainer_department: data.trainer_department || 'Unknown',
+      hotel_code: hotelCode || 'AMSAP',
+      manager_name: data.manager_name || 'Unknown Manager',
+      manager_department: data.manager_department || 'Unknown',
+      evaluation_date: evaluationDate,
+      score_work_area: getScore('score_work_area') || 3,
+      score_appearance: getScore('score_appearance') || 3,
+      score_body_language: getScore('score_body_language') || 3,
+      score_voice: getScore('score_voice') || 3,
+      score_attention: getScore('score_attention') || 3,
+      score_preparation: getScore('score_preparation') || 3,
+      score_demonstration: getScore('score_demonstration') || 3,
+      score_practice: getScore('score_practice') || 3,
+      score_follow_through: getScore('score_follow_through') || 3,
+      score_question_techniques: getScore('score_question_techniques') || 3,
       strengths: data.strengths || '',
       development_areas: data.development_areas || '',
       notes_work_area: '',
@@ -260,7 +322,11 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
       notes_question_techniques: '',
     };
 
-    return validateRows([row]);
+    return {
+      success: true,
+      data: [evaluation],
+      errors: warnings,
+    };
   } catch (error) {
     return {
       success: false,
@@ -275,78 +341,110 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
 function extractScorecardFromText(text: string): Record<string, string> | null {
   const result: Record<string, string> = {};
 
-  // Extract trainer info
-  const trainerNameMatch = text.match(/Trainer\s*Name:\s*([^\n]+?)(?:\s*Trainer\s*Department:|$)/i);
-  if (trainerNameMatch) result.trainer_name = trainerNameMatch[1].trim();
+  // PDF text extraction concatenates items with spaces — no real newlines.
+  // Use flexible patterns that capture values between known labels.
 
-  const trainerDeptMatch = text.match(/Trainer\s*Department:\s*([^\n]+?)(?:\s*Trainer\s*Hotel:|$)/i);
-  if (trainerDeptMatch) result.trainer_department = trainerDeptMatch[1].trim();
+  // Helper: extract value between a label and the next known label/keyword
+  function extract(labelPattern: string, stopWords: string[]): string | null {
+    const stopPattern = stopWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const regex = new RegExp(labelPattern + '\\s*:?\\s*(.+?)\\s*(?:' + stopPattern + '|$)', 'i');
+    const m = text.match(regex);
+    return m ? m[1].trim() : null;
+  }
 
-  const hotelMatch = text.match(/Trainer\s*Hotel:\s*([^\n]+?)(?:\s*Manager|$)/i);
-  if (hotelMatch) {
-    const hotelText = hotelMatch[1].trim();
-    // Try to match a known hotel code
-    const codeMatch = HOTEL_CODES.find(code =>
-      hotelText.toUpperCase().includes(code)
-    );
-    result.hotel_code = codeMatch || hotelText;
+  // Extract trainer info — try multiple possible label orderings
+  const trainerName = extract('Trainer\\s*Name', ['Trainer\\s*Department', 'Department', 'Hotel', 'Manager', 'Date']);
+  if (trainerName) result.trainer_name = trainerName;
+
+  const trainerDept = extract('Trainer\\s*Department', ['Hotel', 'Manager', 'Date', 'Trainer\\s*Hotel']);
+  if (trainerDept) result.trainer_department = trainerDept;
+
+  // Hotel code — look for any known hotel code anywhere in the text
+  const hotelCodeDirect = HOTEL_CODES.find(code => text.toUpperCase().includes(code));
+  if (hotelCodeDirect) {
+    result.hotel_code = hotelCodeDirect;
+  } else {
+    const hotelVal = extract('(?:Trainer\\s*)?Hotel', ['Manager', 'Date', 'Name', 'Presentation']);
+    if (hotelVal) {
+      const codeMatch = HOTEL_CODES.find(code => hotelVal.toUpperCase().includes(code));
+      result.hotel_code = codeMatch || hotelVal;
+    }
   }
 
   // Extract manager info
-  const managerNameMatch = text.match(/Manager\s*Name:\s*([^\n]+?)(?:\s*Manager\s*Department:|$)/i);
-  if (managerNameMatch) result.manager_name = managerNameMatch[1].trim();
+  const managerName = extract('Manager\\s*Name', ['Manager\\s*Department', 'Department', 'Date', 'Presentation']);
+  if (managerName) result.manager_name = managerName;
 
-  const managerDeptMatch = text.match(/Manager\s*Department:\s*([^\n]+?)(?:\s*Date|$)/i);
-  if (managerDeptMatch) result.manager_department = managerDeptMatch[1].trim();
+  const managerDept = extract('Manager\\s*Department', ['Date', 'Presentation', 'Score', 'Training']);
+  if (managerDept) result.manager_department = managerDept;
 
-  const dateMatch = text.match(/Date\s*(?:of\s*training)?:\s*([^\n]+?)(?:\s*Manager|$)/i);
-  if (dateMatch) result.evaluation_date = dateMatch[1].trim();
+  // Date — try multiple patterns
+  const datePatterns = [
+    /Date\s*(?:of\s*(?:training|evaluation))?\s*:?\s*(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4})/i,
+    /Date\s*:?\s*(\d{4}-\d{1,2}-\d{1,2})/i,
+    /(\d{1,2}\.\d{1,2}\.\d{4})/,
+    /(\d{1,2}\/\d{1,2}\/\d{4})/,
+  ];
+  for (const dp of datePatterns) {
+    const dm = text.match(dp);
+    if (dm) {
+      result.evaluation_date = dm[1].trim();
+      break;
+    }
+  }
 
-  // Extract scores - look for numbers 1-5 near criterion labels
+  // Extract scores — look for numbers 1-5 near criterion labels
+  // PDF text may have the score right after the label text or nearby
   const scorePatterns: [string, string][] = [
-    ['Work\\s*Area', 'score_work_area'],
+    ['Work\\s*(?:Area|area)', 'score_work_area'],
     ['Appearance', 'score_appearance'],
-    ['Body\\s*Language', 'score_body_language'],
+    ['Body\\s*[Ll]anguage', 'score_body_language'],
     ['Voice', 'score_voice'],
     ['Attention', 'score_attention'],
-    ['Preparation\\s*\\(has', 'score_preparation'],
+    ['Preparation', 'score_preparation'],
     ['Demonstration', 'score_demonstration'],
-    ['Practice\\s*\\(allows', 'score_practice'],
-    ['Follow\\s*through', 'score_follow_through'],
-    ['Question\\s*techniques', 'score_question_techniques'],
+    ['Practice', 'score_practice'],
+    ['Follow\\s*[Tt]hrough', 'score_follow_through'],
+    ['Question\\s*[Tt]echniques', 'score_question_techniques'],
   ];
 
   for (const [pattern, field] of scorePatterns) {
-    // Look for a score (1-5) appearing near the criterion text
-    const regex = new RegExp(pattern + '[^\\d]*([1-5])', 'i');
+    // Look for a score (1-5) within ~80 chars after the criterion text
+    const regex = new RegExp(pattern + '(?:[^\\d]{0,80}?)([1-5])(?:\\s|\\b)', 'i');
     const match = text.match(regex);
     if (match) {
       result[field] = match[1];
     }
   }
 
-  // Extract averages section for scores if individual scores weren't found
-  const avgPresentationMatch = text.match(/Presentation\s*skills?:\s*([\d.]+)/i);
-  const avgDeliveryMatch = text.match(/Training\s*delivery:\s*([\d.]+)/i);
-  const avgCoachingMatch = text.match(/Coaching:\s*([\d.]+)/i);
-  const overallMatch = text.match(/Overall\s*Score:\s*([\d.]+)/i);
-
-  // Extract strengths and development areas
-  const strengthsMatch = text.match(/Strengths?\s*\(mandatory\):\s*([\s\S]+?)(?:Development|$)/i);
-  if (strengthsMatch) result.strengths = strengthsMatch[1].trim();
-
-  const devMatch = text.match(/Development\s*areas?\s*\(Mandatory\):\s*([\s\S]+?)(?:Trainer\s*Name\s*&\s*Signature|$)/i);
-  if (devMatch) result.development_areas = devMatch[1].trim();
-
-  // Check if we got enough data to be useful
-  const hasTrainer = result.trainer_name && result.trainer_name.length > 0;
-  const hasScores = Object.keys(result).filter(k => k.startsWith('score_')).length > 0;
-
-  if (!hasTrainer && !hasScores) {
-    return null;
+  // Extract strengths and development areas — very flexible patterns
+  const strengthPatterns = [
+    /Strengths?\s*\(?\s*[Mm]andatory\s*\)?\s*:?\s*([\s\S]+?)(?:Development|$)/i,
+    /Strengths?\s*:?\s*([\s\S]+?)(?:Development|Areas?\s*to|$)/i,
+  ];
+  for (const sp of strengthPatterns) {
+    const sm = text.match(sp);
+    if (sm && sm[1].trim().length > 0) {
+      result.strengths = sm[1].trim();
+      break;
+    }
   }
 
-  return result;
+  const devPatterns = [
+    /Development\s*[Aa]reas?\s*\(?\s*[Mm]andatory\s*\)?\s*:?\s*([\s\S]+?)(?:Trainer\s*Name\s*&|Signature|$)/i,
+    /Development\s*[Aa]reas?\s*:?\s*([\s\S]+?)(?:Trainer\s*Name|Signature|$)/i,
+    /Areas?\s*(?:to|for)\s*[Ii]mprov(?:e|ement)\s*:?\s*([\s\S]+?)(?:Trainer\s*Name|Signature|$)/i,
+  ];
+  for (const dp of devPatterns) {
+    const dm = text.match(dp);
+    if (dm && dm[1].trim().length > 0) {
+      result.development_areas = dm[1].trim();
+      break;
+    }
+  }
+
+  // Return whatever we found — even partial data is OK
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 export function parseFile(file: File): Promise<ParseResult> {
