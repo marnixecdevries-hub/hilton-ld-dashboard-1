@@ -29,6 +29,9 @@ export async function submitEvaluation(data: ParsedEvaluation) {
     .single();
 
   if (error) {
+    console.error('Supabase insert error:', error);
+    console.error('Supabase URL loaded:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.error('Supabase Key loaded:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
     return { success: false, error: error.message };
   }
 
