@@ -199,7 +199,7 @@ function validateRows(rows: Record<string, string>[]): ParseResult {
 export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
     const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
 
