@@ -67,7 +67,7 @@ export default function DropZone() {
         onClick={() => {
           const input = document.createElement('input');
           input.type = 'file';
-          input.accept = '.csv,.xlsx,.xls';
+          input.accept = '.csv,.xlsx,.xls,.pdf';
           input.onchange = (e) => {
             const file = (e.target as HTMLInputElement).files?.[0];
             if (file) handleFile(file);
@@ -83,7 +83,7 @@ export default function DropZone() {
         <p className="mt-4 text-gray-600 font-medium">
           {loading ? 'Parsing file...' : 'Drag your scorecard file here or click to browse'}
         </p>
-        <p className="text-sm text-gray-400 mt-2">Accepts .csv and .xlsx files</p>
+        <p className="text-sm text-gray-400 mt-2">Accepts .csv, .xlsx, and .pdf files</p>
       </div>
 
       {/* Validation errors */}

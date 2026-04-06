@@ -9,7 +9,7 @@ export default function UploadPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-hilton-blue">Upload Scorecard</h1>
-          <p className="text-gray-500 mt-1">Upload a completed evaluation scorecard (CSV or Excel)</p>
+          <p className="text-gray-500 mt-1">Upload a completed evaluation scorecard (CSV, Excel, or PDF)</p>
         </div>
         <a
           href="/templates/scorecard-template.csv"
