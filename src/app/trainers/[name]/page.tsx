@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { ArrowLeft } from 'lucide-react';
 import EvaluationTable from '@/components/tables/EvaluationTable';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { Evaluation, ScoreCriterion } from '@/types';
 import { SCORE_FIELDS, CRITERIA_LABELS, HOTELS, COLORS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
@@ -22,7 +22,7 @@ export default function TrainerDrilldown({ params }: { params: Promise<{ name: s
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await getSupabase()
         .from('evaluations')
         .select('*')
         .eq('trainer_name', trainerName)
@@ -34,7 +34,7 @@ export default function TrainerDrilldown({ params }: { params: Promise<{ name: s
       // Fetch hotel peers for comparison
       if (evals.length > 0) {
         const hotelCode = evals[0].hotel_code;
-        const { data: hotelData } = await supabase
+        const { data: hotelData } = await getSupabase()
           .from('evaluations')
           .select('*')
           .eq('hotel_code', hotelCode);

@@ -1,8 +1,8 @@
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 import { Evaluation } from '@/types';
 
 export async function getRecentEvaluations(limit = 10): Promise<Evaluation[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('evaluations')
     .select('*')
     .order('evaluation_date', { ascending: false })
@@ -12,7 +12,7 @@ export async function getRecentEvaluations(limit = 10): Promise<Evaluation[]> {
 }
 
 export async function insertEvaluation(evaluation: Omit<Evaluation, 'id' | 'created_at'>): Promise<Evaluation> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('evaluations')
     .insert(evaluation)
     .select()
@@ -22,7 +22,7 @@ export async function insertEvaluation(evaluation: Omit<Evaluation, 'id' | 'crea
 }
 
 export async function getDepartments(): Promise<string[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('evaluations')
     .select('trainer_department');
   if (error) throw error;

@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import FilterBar from '@/components/layout/FilterBar';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { Evaluation } from '@/types';
 import { HOTEL_CODES, HOTELS, SCORE_FIELDS, CRITERIA_LABELS } from '@/lib/constants';
 import { getScoreBgHex } from '@/lib/utils';
@@ -18,7 +18,7 @@ function HotelsContent() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      let query = supabase.from('evaluations').select('*');
+      let query = getSupabase().from('evaluations').select('*');
 
       const department = searchParams.get('department');
       const dateFrom = searchParams.get('from');
@@ -34,7 +34,7 @@ function HotelsContent() {
     }
 
     async function fetchDepartments() {
-      const { data } = await supabase.from('evaluations').select('trainer_department');
+      const { data } = await getSupabase().from('evaluations').select('trainer_department');
       if (data) setDepartments([...new Set(data.map(d => d.trainer_department))].sort());
     }
 

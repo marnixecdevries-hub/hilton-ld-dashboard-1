@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import FilterBar from '@/components/layout/FilterBar';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { Evaluation, HotelCode } from '@/types';
 import { HOTEL_CODES, HOTELS, COLORS, CATEGORY_LABELS, SCORE_FIELDS, CRITERIA_LABELS } from '@/lib/constants';
 import { ScoreCategory, ScoreCriterion } from '@/types';
@@ -19,7 +19,7 @@ function TrendsContent() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      let query = supabase.from('evaluations').select('*').order('evaluation_date', { ascending: true });
+      let query = getSupabase().from('evaluations').select('*').order('evaluation_date', { ascending: true });
 
       const department = searchParams.get('department');
       const dateFrom = searchParams.get('from');
@@ -35,7 +35,7 @@ function TrendsContent() {
     }
 
     async function fetchDepartments() {
-      const { data } = await supabase.from('evaluations').select('trainer_department');
+      const { data } = await getSupabase().from('evaluations').select('trainer_department');
       if (data) setDepartments([...new Set(data.map(d => d.trainer_department))].sort());
     }
 

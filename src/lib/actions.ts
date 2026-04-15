@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 import { ParsedEvaluation } from '@/types';
 import { computeAverages } from './utils';
 
@@ -22,7 +22,7 @@ export async function submitEvaluation(data: ParsedEvaluation) {
     notes_question_techniques: data.notes_question_techniques || null,
   };
 
-  const { data: result, error } = await supabase
+  const { data: result, error } = await getSupabase()
     .from('evaluations')
     .insert(record)
     .select()

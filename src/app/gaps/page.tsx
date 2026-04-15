@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import FilterBar from '@/components/layout/FilterBar';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { Evaluation, ScoreCriterion, HotelCode } from '@/types';
 import { SCORE_FIELDS, CRITERIA_LABELS, HOTEL_CODES, HOTELS, CATEGORY_CRITERIA, CATEGORY_LABELS, COLORS } from '@/lib/constants';
 import { getScoreBgHex, getScoreColor } from '@/lib/utils';
@@ -19,7 +19,7 @@ function GapsContent() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      let query = supabase.from('evaluations').select('*');
+      let query = getSupabase().from('evaluations').select('*');
 
       const hotels = searchParams.get('hotels')?.split(',').filter(Boolean);
       const department = searchParams.get('department');
@@ -37,7 +37,7 @@ function GapsContent() {
     }
 
     async function fetchDepartments() {
-      const { data } = await supabase.from('evaluations').select('trainer_department');
+      const { data } = await getSupabase().from('evaluations').select('trainer_department');
       if (data) setDepartments([...new Set(data.map(d => d.trainer_department))].sort());
     }
 

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import FilterBar from '@/components/layout/FilterBar';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { Evaluation, HotelCode } from '@/types';
 import { getScoreColor } from '@/lib/utils';
 
@@ -19,7 +19,7 @@ function TrainersContent() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      let query = supabase.from('evaluations').select('*').order('evaluation_date', { ascending: false });
+      let query = getSupabase().from('evaluations').select('*').order('evaluation_date', { ascending: false });
 
       const hotels = searchParams.get('hotels')?.split(',').filter(Boolean);
       const department = searchParams.get('department');
@@ -33,7 +33,7 @@ function TrainersContent() {
     }
 
     async function fetchDepartments() {
-      const { data } = await supabase.from('evaluations').select('trainer_department');
+      const { data } = await getSupabase().from('evaluations').select('trainer_department');
       if (data) setDepartments([...new Set(data.map(d => d.trainer_department))].sort());
     }
 

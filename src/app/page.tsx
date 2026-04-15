@@ -7,7 +7,7 @@ import HotelBarChart from '@/components/charts/HotelBarChart';
 import CriteriaRadarChart from '@/components/charts/CriteriaRadarChart';
 import EvaluationTable from '@/components/tables/EvaluationTable';
 import FilterBar from '@/components/layout/FilterBar';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { Evaluation } from '@/types';
 import { HOTEL_CODES } from '@/lib/constants';
 
@@ -21,7 +21,7 @@ function OverviewContent() {
     async function fetchData() {
       setLoading(true);
 
-      let query = supabase.from('evaluations').select('*').order('evaluation_date', { ascending: false });
+      let query = getSupabase().from('evaluations').select('*').order('evaluation_date', { ascending: false });
 
       const hotels = searchParams.get('hotels')?.split(',').filter(Boolean);
       const department = searchParams.get('department');
@@ -39,7 +39,7 @@ function OverviewContent() {
     }
 
     async function fetchDepartments() {
-      const { data } = await supabase.from('evaluations').select('trainer_department');
+      const { data } = await getSupabase().from('evaluations').select('trainer_department');
       if (data) {
         setDepartments([...new Set(data.map(d => d.trainer_department))].sort());
       }
