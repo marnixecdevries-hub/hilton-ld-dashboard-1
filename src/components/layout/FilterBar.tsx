@@ -2,15 +2,28 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
-import { HOTELS, HOTEL_CODES } from '@/lib/constants';
+import { HOTEL_CODES } from '@/lib/constants';
 import { HotelCode } from '@/types';
 import { RotateCcw } from 'lucide-react';
+
+const DEPARTMENTS = [
+  'Front office',
+  'Food & Drinks',
+  'Housekeeping',
+  'GC&E',
+  'Marketing',
+  'Technical department',
+  'Banqueting',
+  'Kitchen',
+  'Spa & Wellness',
+  'Human Resources',
+];
 
 interface FilterBarProps {
   departments?: string[];
 }
 
-export default function FilterBar({ departments = [] }: FilterBarProps) {
+export default function FilterBar({ departments: _ = [] }: FilterBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -49,7 +62,7 @@ export default function FilterBar({ departments = [] }: FilterBarProps) {
           >
             <option value="">All Hotels</option>
             {HOTEL_CODES.map(code => (
-              <option key={code} value={code}>{code} — {HOTELS[code]}</option>
+              <option key={code} value={code}>{code}</option>
             ))}
           </select>
         </div>
@@ -62,7 +75,7 @@ export default function FilterBar({ departments = [] }: FilterBarProps) {
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:border-hilton-blue focus:ring-1 focus:ring-hilton-blue outline-none"
           >
             <option value="">All Departments</option>
-            {departments.map(dept => (
+            {DEPARTMENTS.map(dept => (
               <option key={dept} value={dept}>{dept}</option>
             ))}
           </select>
