@@ -70,6 +70,7 @@ function validateRow(row: Record<string, string>, rowIndex: number): { data?: Pa
   }
 
   const data: ParsedEvaluation = {
+    training_name: row.training_name?.trim() || 'Train the Trainer',
     trainer_name: row.trainer_name.trim(),
     trainer_department: row.trainer_department.trim(),
     hotel_code: hotelCode,
@@ -292,6 +293,7 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
     }
 
     const evaluation: ParsedEvaluation = {
+      training_name: data.training_name || 'Train the Trainer',
       trainer_name: data.trainer_name || 'Unknown Trainer',
       trainer_department: data.trainer_department || 'Unknown',
       hotel_code: hotelCode || 'AMSAP',

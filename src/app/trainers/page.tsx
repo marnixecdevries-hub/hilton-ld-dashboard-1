@@ -59,10 +59,14 @@ function TrainersContent() {
       trend = diff > 0.1 ? 'up' : diff < -0.1 ? 'down' : 'flat';
     }
 
+    // Collect unique training names for this trainer
+    const trainingNames = [...new Set(evals.map(e => e.training_name || 'Train the Trainer'))];
+
     return {
       name,
       hotel_code: latest.hotel_code as HotelCode,
       department: latest.trainer_department,
+      training_names: trainingNames,
       evaluation_count: evals.length,
       latest_overall: Number(latest.avg_overall),
       avg_overall: Number(avgOverall.toFixed(2)),
@@ -111,6 +115,7 @@ function TrainersContent() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Trainer</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Hotel</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Department</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Training(s)</th>
                 <th className="text-center px-4 py-3 font-medium text-gray-500">Evaluations</th>
                 <th className="text-center px-4 py-3 font-medium text-gray-500">Avg Score</th>
                 <th className="text-center px-4 py-3 font-medium text-gray-500">Latest</th>
@@ -127,6 +132,13 @@ function TrainersContent() {
                   </td>
                   <td className="px-4 py-3 text-gray-600">{t.hotel_code}</td>
                   <td className="px-4 py-3 text-gray-600">{t.department}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {t.training_names.map(tn => (
+                        <span key={tn} className="inline-block bg-hilton-blue/10 text-hilton-blue text-xs px-2 py-0.5 rounded-full font-medium">{tn}</span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="text-center px-4 py-3 text-gray-600">{t.evaluation_count}</td>
                   <td className="text-center px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${getScoreColor(t.avg_overall)}`}>

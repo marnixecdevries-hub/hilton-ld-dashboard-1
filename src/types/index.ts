@@ -1,6 +1,7 @@
 export interface Evaluation {
   id: string;
   hotel_code: HotelCode;
+  training_name: string;
   trainer_name: string;
   trainer_department: string;
   manager_name: string;
@@ -64,6 +65,7 @@ export interface TrainerSummary {
 
 export interface ParsedEvaluation {
   hotel_code: string;
+  training_name: string;
   trainer_name: string;
   trainer_department: string;
   manager_name: string;
