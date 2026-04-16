@@ -12,7 +12,7 @@ export default function UploadPage() {
           <p className="text-gray-500 mt-1">Upload a completed evaluation scorecard (CSV, Excel, or PDF)</p>
         </div>
         <a
-          href="/templates/scorecard-template.csv"
+          href="/templates/scorecard-template.pdf"
           download
           className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         >

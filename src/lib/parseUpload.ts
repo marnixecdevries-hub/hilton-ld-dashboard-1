@@ -341,109 +341,89 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
 function extractScorecardFromText(text: string): Record<string, string> | null {
   const result: Record<string, string> = {};
 
-  // PDF text extraction concatenates items with spaces — no real newlines.
-  // Use flexible patterns that capture values between known labels.
+  // --- Header fields ---
+  // Format: "Trainer Name: X Trainer Department: Y Trainer Hotel: Z"
+  //         "Manager Name: X Manager Department: Y Date of training: DD-MM-YYYY"
 
-  // Helper: extract value between a label and the next known label/keyword
-  function extract(labelPattern: string, stopWords: string[]): string | null {
-    const stopPattern = stopWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-    const regex = new RegExp(labelPattern + '\\s*:?\\s*(.+?)\\s*(?:' + stopPattern + '|$)', 'i');
-    const m = text.match(regex);
-    return m ? m[1].trim() : null;
+  const trainerNameMatch = text.match(/Trainer\s*Name\s*:\s*(.+?)\s+Trainer\s*Department\s*:/i);
+  if (trainerNameMatch) result.trainer_name = trainerNameMatch[1].trim();
+
+  const trainerDeptMatch = text.match(/Trainer\s*Department\s*:\s*(.+?)\s+Trainer\s*Hotel\s*:/i);
+  if (trainerDeptMatch) result.trainer_department = trainerDeptMatch[1].trim();
+
+  const trainerHotelMatch = text.match(/Trainer\s*Hotel\s*:\s*(.+?)\s+Manager\s*Name\s*:/i);
+  if (trainerHotelMatch) {
+    const hotelText = trainerHotelMatch[1].trim().toUpperCase();
+    const codeMatch = HOTEL_CODES.find(code => hotelText.includes(code));
+    if (codeMatch) result.hotel_code = codeMatch;
   }
 
-  // Extract trainer info — try multiple possible label orderings
-  const trainerName = extract('Trainer\\s*Name', ['Trainer\\s*Department', 'Department', 'Hotel', 'Manager', 'Date']);
-  if (trainerName) result.trainer_name = trainerName;
+  // Fallback: scan for any hotel code anywhere
+  if (!result.hotel_code) {
+    const found = HOTEL_CODES.find(code => text.toUpperCase().includes(code));
+    if (found) result.hotel_code = found;
+  }
 
-  const trainerDept = extract('Trainer\\s*Department', ['Hotel', 'Manager', 'Date', 'Trainer\\s*Hotel']);
-  if (trainerDept) result.trainer_department = trainerDept;
+  const managerNameMatch = text.match(/Manager\s*Name\s*:\s*(.+?)\s+Manager\s*Department\s*:/i);
+  if (managerNameMatch) result.manager_name = managerNameMatch[1].trim();
 
-  // Hotel code — look for any known hotel code anywhere in the text
-  const hotelCodeDirect = HOTEL_CODES.find(code => text.toUpperCase().includes(code));
-  if (hotelCodeDirect) {
-    result.hotel_code = hotelCodeDirect;
-  } else {
-    const hotelVal = extract('(?:Trainer\\s*)?Hotel', ['Manager', 'Date', 'Name', 'Presentation']);
-    if (hotelVal) {
-      const codeMatch = HOTEL_CODES.find(code => hotelVal.toUpperCase().includes(code));
-      result.hotel_code = codeMatch || hotelVal;
+  const managerDeptMatch = text.match(/Manager\s*Department\s*:\s*(.+?)\s+Date\s*of\s*training\s*:/i);
+  if (managerDeptMatch) result.manager_department = managerDeptMatch[1].trim();
+
+  const dateMatch = text.match(/Date\s*of\s*training\s*:\s*(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})/i)
+    || text.match(/Date\s*:\s*(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})/i);
+  if (dateMatch) result.evaluation_date = dateMatch[1].trim();
+
+  // --- Score extraction ---
+  // Scores live in table columns. The digit appears isolated (not part of a hyphenated
+  // expression like "4-step"). Strategy: find criterion start, find the section up to
+  // the next criterion, then take the LAST isolated [1-5] digit in that section.
+
+  function extractScore(criterionPattern: string, nextCriterionPattern?: string): string | null {
+    const startMatch = text.search(new RegExp(criterionPattern, 'i'));
+    if (startMatch === -1) return null;
+
+    let end = text.length;
+    if (nextCriterionPattern) {
+      const nextIdx = text.slice(startMatch + 1).search(new RegExp(nextCriterionPattern, 'i'));
+      if (nextIdx !== -1) end = startMatch + 1 + nextIdx;
     }
+    // Cap search window at 500 chars
+    end = Math.min(end, startMatch + 500);
+
+    const section = text.slice(startMatch, end);
+
+    // Find all isolated digits [1-5]: not preceded/followed by digit, letter, or hyphen
+    const matches = [...section.matchAll(/(?<![0-9A-Za-z-])([1-5])(?![0-9A-Za-z-])/g)];
+    if (matches.length === 0) return null;
+
+    // The score is the LAST isolated digit in the section (appears in the score column)
+    return matches[matches.length - 1][1];
   }
 
-  // Extract manager info
-  const managerName = extract('Manager\\s*Name', ['Manager\\s*Department', 'Department', 'Date', 'Presentation']);
-  if (managerName) result.manager_name = managerName;
+  // Presentation Skills (page 2)
+  result.score_work_area        = extractScore('Work\\s*Area',       'Trainer:\\s*Appearance|Appearance') || '';
+  result.score_appearance       = extractScore('Trainer:\\s*Appearance|(?<!Work\\s*Area[^]*?)Appearance', 'Body\\s*Language') || '';
+  result.score_body_language    = extractScore('Body\\s*Language',   'Voice') || '';
+  result.score_voice            = extractScore('Voice:\\s*Pace',     'Attention') || '';
+  result.score_attention        = extractScore('Attention:\\s*What', 'Training\\s*delivery|Preparation\\s*\\(has') || '';
 
-  const managerDept = extract('Manager\\s*Department', ['Date', 'Presentation', 'Score', 'Training']);
-  if (managerDept) result.manager_department = managerDept;
+  // Training Delivery (page 3)
+  result.score_preparation      = extractScore('Preparation\\s*\\(has', 'Demonstration') || '';
+  result.score_demonstration    = extractScore('Demonstration\\s*\\(breaks', 'Practice\\s*\\(allows') || '';
+  result.score_practice         = extractScore('Practice\\s*\\(allows',    'Coaching|Follow\\s*through') || '';
 
-  // Date — try multiple patterns
-  const datePatterns = [
-    /Date\s*(?:of\s*(?:training|evaluation))?\s*:?\s*(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4})/i,
-    /Date\s*:?\s*(\d{4}-\d{1,2}-\d{1,2})/i,
-    /(\d{1,2}\.\d{1,2}\.\d{4})/,
-    /(\d{1,2}\/\d{1,2}\/\d{4})/,
-  ];
-  for (const dp of datePatterns) {
-    const dm = text.match(dp);
-    if (dm) {
-      result.evaluation_date = dm[1].trim();
-      break;
-    }
-  }
+  // Coaching (page 3)
+  result.score_follow_through   = extractScore('Follow\\s*through',  'Question\\s*techniques') || '';
+  result.score_question_techniques = extractScore('Question\\s*techniques', 'Average|Strengths|$') || '';
 
-  // Extract scores — look for numbers 1-5 near criterion labels
-  // PDF text may have the score right after the label text or nearby
-  const scorePatterns: [string, string][] = [
-    ['Work\\s*(?:Area|area)', 'score_work_area'],
-    ['Appearance', 'score_appearance'],
-    ['Body\\s*[Ll]anguage', 'score_body_language'],
-    ['Voice', 'score_voice'],
-    ['Attention', 'score_attention'],
-    ['Preparation', 'score_preparation'],
-    ['Demonstration', 'score_demonstration'],
-    ['Practice', 'score_practice'],
-    ['Follow\\s*[Tt]hrough', 'score_follow_through'],
-    ['Question\\s*[Tt]echniques', 'score_question_techniques'],
-  ];
+  // --- Strengths & Development areas (page 4) ---
+  const strengthsMatch = text.match(/Strengths?\s*\(mandatory\)\s*:\s*(.+?)\s+Development\s*areas?\s*\(Mandatory\)/i);
+  if (strengthsMatch) result.strengths = strengthsMatch[1].trim();
 
-  for (const [pattern, field] of scorePatterns) {
-    // Look for a score (1-5) within ~80 chars after the criterion text
-    const regex = new RegExp(pattern + '(?:[^\\d]{0,80}?)([1-5])(?:\\s|\\b)', 'i');
-    const match = text.match(regex);
-    if (match) {
-      result[field] = match[1];
-    }
-  }
+  const devMatch = text.match(/Development\s*areas?\s*\(Mandatory\)\s*:\s*(.+?)\s*(?:Trainer\s*Name\s*&\s*Signature|$)/i);
+  if (devMatch) result.development_areas = devMatch[1].trim();
 
-  // Extract strengths and development areas — very flexible patterns
-  const strengthPatterns = [
-    /Strengths?\s*\(?\s*[Mm]andatory\s*\)?\s*:?\s*([\s\S]+?)(?:Development|$)/i,
-    /Strengths?\s*:?\s*([\s\S]+?)(?:Development|Areas?\s*to|$)/i,
-  ];
-  for (const sp of strengthPatterns) {
-    const sm = text.match(sp);
-    if (sm && sm[1].trim().length > 0) {
-      result.strengths = sm[1].trim();
-      break;
-    }
-  }
-
-  const devPatterns = [
-    /Development\s*[Aa]reas?\s*\(?\s*[Mm]andatory\s*\)?\s*:?\s*([\s\S]+?)(?:Trainer\s*Name\s*&|Signature|$)/i,
-    /Development\s*[Aa]reas?\s*:?\s*([\s\S]+?)(?:Trainer\s*Name|Signature|$)/i,
-    /Areas?\s*(?:to|for)\s*[Ii]mprov(?:e|ement)\s*:?\s*([\s\S]+?)(?:Trainer\s*Name|Signature|$)/i,
-  ];
-  for (const dp of devPatterns) {
-    const dm = text.match(dp);
-    if (dm && dm[1].trim().length > 0) {
-      result.development_areas = dm[1].trim();
-      break;
-    }
-  }
-
-  // Return whatever we found — even partial data is OK
   return Object.keys(result).length > 0 ? result : null;
 }
 
