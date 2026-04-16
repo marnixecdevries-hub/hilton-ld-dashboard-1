@@ -49,7 +49,7 @@ export default function UploadPage() {
           Optional: notes_work_area, notes_appearance, notes_body_language, notes_voice, notes_attention, notes_preparation, notes_demonstration, notes_practice, notes_follow_through, notes_question_techniques
         </p>
         <p className="text-xs text-gray-400 mt-1">
-          Hotel codes: AMSAP, AMCSC, AMSHI, AMSWA, RTMHI, AMSHH, SPLSO, ANRHI. Scores must be 1-5.
+          Hotel codes: AMSCS, AMSAP, AMSHI, AMSWA, AMSHH, RTMHI, SPLSO, ANRHI. Scores must be 1-5.
         </p>
       </div>
     </div>

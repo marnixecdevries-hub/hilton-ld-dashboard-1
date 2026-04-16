@@ -1,12 +1,12 @@
 import { HotelCode, ScoreCriterion, ScoreCategory } from '@/types';
 
 export const HOTELS: Record<HotelCode, string> = {
+  AMSCS: 'Conrad Amsterdam',
   AMSAP: 'Waldorf Astoria Amsterdam',
-  AMCSC: 'Conrad Amsterdam',
   AMSHI: 'Hilton Amsterdam',
   AMSWA: 'DoubleTree Amsterdam Centraal Station',
-  RTMHI: 'Hilton Rotterdam',
   AMSHH: 'Hampton by Hilton Amsterdam',
+  RTMHI: 'Hilton Rotterdam',
   SPLSO: 'Hilton Garden Inn Leiden',
   ANRHI: 'Hilton Antwerp',
 };

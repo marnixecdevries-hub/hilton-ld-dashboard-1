@@ -35,7 +35,7 @@ export interface Evaluation {
   created_at: string;
 }
 
-export type HotelCode = 'AMSAP' | 'AMCSC' | 'AMSHI' | 'AMSWA' | 'RTMHI' | 'AMSHH' | 'SPLSO' | 'ANRHI';
+export type HotelCode = 'AMSCS' | 'AMSAP' | 'AMSHI' | 'AMSWA' | 'AMSHH' | 'RTMHI' | 'SPLSO' | 'ANRHI';
 
 export type ScoreCriterion =
   | 'work_area' | 'appearance' | 'body_language' | 'voice' | 'attention'

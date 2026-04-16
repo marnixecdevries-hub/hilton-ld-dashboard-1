@@ -249,7 +249,7 @@ export async function parsePDF(buffer: ArrayBuffer): Promise<ParseResult> {
       return (val >= 1 && val <= 5) ? val : 0;
     };
 
-    // Validate hotel code — try fuzzy matching for OCR errors (e.g. AMSCS → AMCSC)
+    // Validate hotel code — try fuzzy matching for OCR errors
     let hotelCode = (data.hotel_code || '').trim().toUpperCase();
     if (hotelCode && !HOTEL_CODES.includes(hotelCode as typeof HOTEL_CODES[number])) {
       // Try to find closest match (1-character difference)
